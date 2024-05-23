@@ -20,6 +20,8 @@ class SimpleProfiler:
     checkpoint_location = None
     call_rate = None
 
+    recording_rate = None
+
     def __init__(self):
         raise Exception('Singleton, call instance instead.')
 
@@ -37,14 +39,18 @@ class SimpleProfiler:
 
         return cls._instance
 
+    def set_recording_rate(self, recording_rate):
+        self.recording_rate = recording_rate
+
     def __getitem__(self, item):
         if item not in self.timers:
-            self.timers[item] = SimpleTimer()
+            self.timers[item] = SimpleTimer(self.recording_rate)
 
         return self.timers[item]
 
     def generate_statistics(self):
         for i, timer in self.timers.items():
+            timer.close_timer()
             print('Timer {}: {} seconds'.format(i, timer.total_time))
 
     def save(self, output_path):
@@ -66,18 +72,24 @@ class SimpleProfiler:
             data = pickle.load(f)
             SimpleProfiler.instance().timers = data
 
-    def draw_timer_graph(self, t, num_bins, normalise=True):
+    def draw_timer_graph(self, t, num_bins=None, normalise=True):
         timer = self.timers[t]
         print('Timer {}: {} seconds'.format(t, timer.total_time))
 
-        bin_widths = len(timer.recorded_times)//num_bins
+        if num_bins is None:
+            bins = timer.recorded_times
+            x_axis = np.arange(len(bins))
+        else:
+            bin_widths = len(timer.recorded_times)//num_bins
 
-        bins = np.array([np.sum(timer.recorded_times[i*bin_widths:(i+1)*bin_widths]) for i in range(num_bins)])
+            bins = np.array([np.mean(timer.recorded_times[i*bin_widths:(i+1)*bin_widths]) for i in range(num_bins)])
 
-        x_axis = np.arange(num_bins)
+            x_axis = np.arange(num_bins)
+
         if normalise:
             bins = bins/np.sum(bins)
 
         plt.figure()
+        plt.title(t)
         plt.bar(x_axis, bins)
         plt.show()
